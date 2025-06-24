@@ -12,6 +12,7 @@ Lecturer: 劉志尉
 * HW3 
 
 ## Final Porject
+CUDA Accelerated Image Processing - Image Stitching
 
 ## Exam
 * 2018 mid
