@@ -33,8 +33,5 @@ make
 ## How to execute
 Run the program with
 ```
-./bin/stitcher <input1.jpg> <input2.jpg> <output.jpg>
+./bin/stitcher <left_img.jpg> <right_img.jpg> <output.jpg>
 ```
-- input1.jpg : The left image
-- input2.jpg : The right image
-- output.jpg : The output stitched image
