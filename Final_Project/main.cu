@@ -7,12 +7,12 @@
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
+#include <iomanip>
 #define RANSAC_THRESHOLD 5.0f
 
 using namespace std;
 using namespace cv;
 
-// 包含CUDA函數聲明
 extern "C"
 {
     void cuda_feature_matching(float *desc_left, float *desc_right, int desc_left_count, int desc_right_count, int desc_dim, float threshold, int *matches_left, int *matches_right, int *match_count);
@@ -40,12 +40,9 @@ public:
         // CUDA cleanup handled in individual functions
     }
 
-    // 主拼接函數
     Mat stitch(const string &left_path, const string &right_path,
-                   const string &blending_mode, float threshold)
+               const string &blending_mode, float threshold)
     {
-
-        // 讀取圖像
         Mat img_left = imread(left_path);
         Mat img_right = imread(right_path);
         Mat gray_left, gray_right;
@@ -55,7 +52,7 @@ public:
 
         cout << "Images loaded successfully..." << endl;
 
-        // SIFT特征檢測
+        // SIFT
         vector<KeyPoint> kp_left, kp_right;
         Mat desc_left, desc_right;
 
@@ -65,15 +62,13 @@ public:
         cout << "Left keypoints: " << kp_left.size() << endl;
         cout << "Right keypoints: " << kp_right.size() << endl;
 
-        // CUDA特征匹配
         vector<pair<int, int>> matches = performCudaMatching(desc_left, desc_right, threshold);
 
         cout << "Number of matches: " << matches.size() << endl;
 
-        // 繪製匹配結果
+        // Draw matches
         drawMatchingPoint(img_left, img_right, kp_left, kp_right, matches);
 
-        // 準備點對數據
         vector<Point2f> src_points, dst_points;
         for (const auto &match : matches)
         {
@@ -81,22 +76,18 @@ public:
             dst_points.push_back(kp_left[match.first].pt);
         }
 
-        // CUDA RANSAC求解單應性矩陣
         Mat homography = performCudaRANSAC(src_points, dst_points);
 
-        // CUDA圖像變形和融合
         Mat result = performCudaWarping(img_left, img_right, homography, blending_mode);
 
         return result;
     }
 
 private:
-    // CUDA特征匹配
     vector<pair<int, int>> performCudaMatching(
         const Mat &desc_left, const Mat &desc_right, float threshold)
     {
 
-        // 轉換描述符到float格式
         Mat desc_left_f, desc_right_f;
         desc_left.convertTo(desc_left_f, CV_32F);
         desc_right.convertTo(desc_right_f, CV_32F);
@@ -105,7 +96,6 @@ private:
         int desc_right_count = desc_right_f.rows;
         int desc_dim = desc_left_f.cols;
 
-        // 分配GPU內存並調用CUDA函數
         int *matches_left = new int[desc_left_count];
         int *matches_right = new int[desc_left_count];
         int match_count = 0;
@@ -115,7 +105,6 @@ private:
             desc_left_count, desc_right_count, desc_dim, threshold,
             matches_left, matches_right, &match_count);
 
-        // 整理匹配結果
         vector<pair<int, int>> matches;
         for (int i = 0; i < match_count; i++)
         {
@@ -136,7 +125,6 @@ private:
         float *src_data = new float[num_points * 2];
         float *dst_data = new float[num_points * 2];
 
-        // 準備數據
         for (int i = 0; i < num_points; i++)
         {
             src_data[i * 2] = src_points[i].x;
@@ -146,17 +134,33 @@ private:
         }
 
         Mat H_opencv = findHomography(src_points, dst_points, RANSAC, RANSAC_THRESHOLD);
-        cout << "===== opencv matrix ===== \n" << H_opencv << endl;
+        cout << " ====== Opencv matrix ====== " << endl;
+        for (int i = 0; i < H_opencv.rows; ++i)
+        {
+            for (int j = 0; j < H_opencv.cols; ++j)
+            {
+                cout << fixed << setw(8) << setprecision(3) << H_opencv.at<double>(i, j) << " ";
+            }
+            cout << endl;
+        }
 
-    float best_homography[9];  // 3x3 homography matrix (行優先存儲)
-    int max_inliers;
-    
-    // 調用 CUDA RANSAC
-    cuda_ransac_homography(src_data, dst_data, num_points, best_homography, &max_inliers);
-    
-    // 將結果轉換為 OpenCV Mat 格式
-    Mat H = Mat(3, 3, CV_32F, best_homography).clone();
-    
+        float best_homography[9];
+        int max_inliers;
+
+        cuda_ransac_homography(src_data, dst_data, num_points, best_homography, &max_inliers);
+
+        // Trsform to OpenCV Mat form
+        Mat H = Mat(3, 3, CV_32F, best_homography).clone();
+        cout << " ===== Best homography ===== " << endl;
+        for (int i = 0; i < 3; ++i)
+        {
+            for (int j = 0; j < 3; ++j)
+            {
+                cout << fixed << setw(8) << setprecision(3)
+                     << H.at<float>(i, j) << " ";
+            }
+            cout << endl;
+        }
 
         delete[] src_data;
         delete[] dst_data;
@@ -164,7 +168,6 @@ private:
         return H;
     }
 
-    // CUDA圖像變形和融合
     Mat performCudaWarping(const Mat &img_left, const Mat &img_right, const Mat &homography, const string &blending_mode)
     {
 
@@ -173,14 +176,23 @@ private:
         int stitch_height = max(hl, hr);
         int stitch_width = wl + wr;
 
-        // 創建拼接結果圖像
+        // Create stich image
         Mat stitch_img = Mat::zeros(stitch_height, stitch_width, CV_8UC3);
 
-        // 計算逆單應性矩陣
+        // Compute inverse homography
         Mat inv_homography = homography.inv();
         inv_homography.convertTo(inv_homography, CV_32F);
+        cout << " ===== INV  homography ===== " << endl;
+        for (int i = 0; i < 3; ++i)
+        {
+            for (int j = 0; j < 3; ++j)
+            {
+                cout << fixed << setw(8) << setprecision(3)
+                     << inv_homography.at<float>(i, j) << " ";
+            }
+            cout << endl;
+        }
 
-        // 調用CUDA變形函數
         cuda_image_warping(
             img_right.data, stitch_img.data,
             hr, wr, stitch_height, stitch_width,
@@ -188,11 +200,9 @@ private:
 
         cuda_linear_blending(img_left.data, stitch_img.data, stitch_img.data, stitch_height, stitch_width, wl);
 
-        // 移除黑邊
         return removeBlackBorder(stitch_img);
     }
 
-    // 繪製匹配結果
     void drawMatchingPoint(const Mat &img_left, const Mat &img_right,
                            const vector<KeyPoint> &kp_left,
                            const vector<KeyPoint> &kp_right,
@@ -217,13 +227,12 @@ private:
         cout << "Matching visualization saved to matching.jpg" << endl;
     }
 
-    // 移除黑邊
     Mat removeBlackBorder(const Mat &img)
     {
         int h = img.rows, w = img.cols;
         int reduced_h = h, reduced_w = w;
 
-        // 從右到左
+        // from right to left
         for (int col = w - 1; col >= 0; col--)
         {
             bool all_black = true;
@@ -242,7 +251,7 @@ private:
                 break;
         }
 
-        // 從下到上
+        // from bottom to top
         for (int row = h - 1; row >= 0; row--)
         {
             bool all_black = true;
@@ -275,7 +284,7 @@ int main(int argc, char *argv[])
             return 1;
         }
 
-        // 檢查CUDA設備
+        // Check CUDA device
         int deviceCount;
         cudaGetDeviceCount(&deviceCount);
         if (deviceCount == 0)
@@ -286,12 +295,10 @@ int main(int argc, char *argv[])
 
         cout << "Found " << deviceCount << " CUDA device(s)" << endl;
 
-        // 設置圖像路徑
         string left_path = argv[1];
         string right_path = argv[2];
         string stitch = argv[3];
 
-        // 顯示原始圖像
         Mat img_left = imread(left_path);
         Mat img_right = imread(right_path);
 
@@ -301,16 +308,14 @@ int main(int argc, char *argv[])
             return -1;
         }
 
-        //Mat total;
-        //hconcat(img_left, img_right, total);
+        // Mat total;
+        // hconcat(img_left, img_right, total);
         // imshow("Total", total);
 
-        // 執行CUDA拼接
         CudaStitcher stitcher;
         string blending_mode = "linearBlendingWithConstant";
         Mat result = stitcher.stitch(left_path, right_path, blending_mode, 0.75f);
 
-        // 顯示和保存結果
         // imshow("stitch", result);
         imwrite(stitch, result);
         waitKey(0);
