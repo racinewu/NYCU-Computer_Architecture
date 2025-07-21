@@ -7,7 +7,7 @@
 #define CONSTANT_BLEND_WIDTH 5
 #define constant_width 10
 
-// CUDA核函數：圖像變形
+// CUDA kernel: warp image
 __global__ void warp_image_kernel(unsigned char *img_right, unsigned char *stitch_img, int img_height, int img_width, int stitch_height, int stitch_width, float *H)
 {
     int j = blockIdx.x * blockDim.x + threadIdx.x;
@@ -41,40 +41,42 @@ __global__ void warp_image_kernel(unsigned char *img_right, unsigned char *stitc
     }
 }
 
-// CUDA核函數：線性融合
+// CUDA kernel: linear blending
 __global__ void linear_blending_kernel(
-    unsigned char* img_left, unsigned char* img_right,
-    unsigned char* result, float* alpha_mask,
+    unsigned char *img_left, unsigned char *img_right,
+    unsigned char *result, float *alpha_mask,
     int height, int width, int wl)
 {
     int i = blockIdx.y * blockDim.y + threadIdx.y;
     int j = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (i >= height || j >= width) return;
-    if (j >= wl) return;  // 超出左圖範圍就跳過
+    if (i >= height || j >= width)
+        return;
+    if (j >= wl)
+        return; // Skip if exceed
 
     int result_idx = (i * width + j) * 3;
     int left_idx = (i * wl + j) * 3;
     float alpha = alpha_mask[i * width + j];
 
-    if (alpha == 1.0f) {
-        for (int c = 0; c < 3; c++) {
+    if (alpha == 1.0f)
+    {
+        for (int c = 0; c < 3; c++)
+        {
             result[result_idx + c] = img_left[left_idx + c];
         }
     }
-    else if (alpha > 0.0f) {
+    else if (alpha > 0.0f)
+    {
         float beta = 1.0f - alpha;
-        for (int c = 0; c < 3; c++) {
-            result[result_idx + c] = (unsigned char)(
-                alpha * img_left[left_idx + c] + beta * img_right[result_idx + c]
-            );
+        for (int c = 0; c < 3; c++)
+        {
+            result[result_idx + c] = (unsigned char)(alpha * img_left[left_idx + c] + beta * img_right[result_idx + c]);
         }
     }
-    // alpha == 0: 不用動，右圖內容已在 result 初始化
 }
 
-// CUDA核函數：計算alpha掩碼（常數寬度線性融合）
-// CUDA kernel to compute alpha mask for linear blending with constant width
+// CUDA kernel: Compute alpha mask for linear blending with constant width
 __global__ void compute_alpha_mask_kernel(unsigned char *img_left, unsigned char *img_right, float *alpha_mask, int height, int width, int wl)
 {
     int i = blockIdx.y * blockDim.y + threadIdx.y;
@@ -95,7 +97,7 @@ __global__ void compute_alpha_mask_kernel(unsigned char *img_left, unsigned char
 
             if (left_nonzero)
             {
-                alpha_mask[i * width + j] = 1.0f; // 這裡補全不重疊區域
+                alpha_mask[i * width + j] = 1.0f; // Fill non-overlap area
             }
         }
 
@@ -155,10 +157,9 @@ __global__ void compute_alpha_mask_kernel(unsigned char *img_left, unsigned char
     }
 }
 
-// 主機函數：CUDA圖像變形
+// Host function：CUDA image warping
 extern "C" void cuda_image_warping(unsigned char *img_right, unsigned char *stitch_img, int img_height, int img_width, int stitch_height, int stitch_width, const float *inv_homography)
 {
-
     printf("Begin warping...\n");
 
     unsigned char *d_img_right, *d_stitch_img;
@@ -189,21 +190,19 @@ extern "C" void cuda_image_warping(unsigned char *img_right, unsigned char *stit
     cudaFree(d_inv_homography);
 }
 
-// 主機函數：CUDA線性融合
+// Host function: CUDA linear blending
 extern "C" void cuda_linear_blending(unsigned char *img_left_data, unsigned char *img_right_data, unsigned char *result_data, int height, int width, int wl)
 {
     printf("Begin linear blending...\n");
 
-    // Device memory pointers
+    // Device memory allocation
     unsigned char *d_img_left, *d_img_right, *d_result;
     float *d_alpha_mask;
 
-    // Calculate sizes
     size_t left_size = height * wl * 3 * sizeof(unsigned char);
     size_t right_size = height * width * 3 * sizeof(unsigned char);
     size_t alpha_size = height * width * sizeof(float);
 
-    // Allocate device memory
     cudaMalloc(&d_img_left, left_size);
     cudaMalloc(&d_img_right, right_size);
     cudaMalloc(&d_result, right_size);
@@ -227,7 +226,7 @@ extern "C" void cuda_linear_blending(unsigned char *img_left_data, unsigned char
     dim3 blend_grid((width + blend_block.x - 1) / blend_block.x, (height + blend_block.y - 1) / blend_block.y);
     linear_blending_kernel<<<blend_grid, blend_block>>>(d_img_left, d_img_right, d_result, d_alpha_mask, height, width, wl);
 
-    // Copy result back to host
+    // Copy results back to host
     cudaMemcpy(result_data, d_result, right_size, cudaMemcpyDeviceToHost);
 
     // Free device memory
