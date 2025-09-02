@@ -2,24 +2,24 @@
 
 NYCU 2025 Spring Computer Architecture
 
-Lecturer: 劉志尉
+Lecturer: 劉志尉 Chih-Wei Liu
 
 ## Lecture
 - Intro
-- Fundamentals
-- ISA
+- Fundamentals of Quantitative Design and Analysis
+- Instruction Set Principles
 - Memory Hierachy Design
 - Pipelining
-- Software Scheduling
-- ILP Limit
-- DLP in Vector SIMD and GPU Architectures
-- Multiprocessors and TLP
-- TLP-II
+- Compiler Techniques for ILP & Branch Prediction
+- Dynamic Scheduling for ILP
+- Limits on ILP & Multithreading
+- Data Level Parallelism in Vector, SIMD, and GPU Architectures
+- Thread Level Parallelism
 
-## HW
-- HW1 
-- HW2 
-- HW3 
+## Homework
+- HW1
+- HW2
+- HW3
 
 ## Final Porject
 CUDA Accelerated Image Processing - Image Stitching
