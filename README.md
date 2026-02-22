@@ -22,7 +22,7 @@ Lecturer: 劉志尉 Chih-Wei Liu
 - HW3
 
 ## Final Porject
-CUDA Accelerated Image Processing - Image Stitching
+CUDA Accelerated Image Processing - Image Stitching [README](Final_Project\README.md)
 
 ## Exam
 - 2018 mid
