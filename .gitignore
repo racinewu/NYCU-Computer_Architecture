@@ -1,0 +1,11 @@
+Homework/
+Slides/
+build/
+bin/
+/*.pdf
+/*.png
+/*.docx
+*.zip
+*.mp4
+Final_Project/**/*.pdf
+Final_Project/Readme.txt
