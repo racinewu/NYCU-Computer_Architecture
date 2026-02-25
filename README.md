@@ -4,6 +4,9 @@ NYCU 2025 Spring Computer Architecture
 
 Lecturer: 劉志尉 Chih-Wei Liu
 
+## Textbook
+- [J. L. Hennessy and D. A. Patterson, *Computer Architecture A Quantitative Approach*, 6th ed. Morgan Kaufmann, 2017.](https://www.google.com.tw/books/edition/Computer_Architecture/cM8mDwAAQBAJ?hl=zh-TW&gbpv=0)
+
 ## Lecture
 - Intro
 - Fundamentals of Quantitative Design and Analysis
